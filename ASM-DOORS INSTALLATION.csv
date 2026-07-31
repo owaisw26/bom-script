@@ -1,0 +1,6 @@
+﻿Level,Title,Enterprise Item Number,Revision,Title (Instance),Is Latest Revision,Maturity State,Owner,Lock,Modification Date,Type,Name,
+0,"ASM-DOORS INSTALLATION","None","A.1",,"true","In Work","Jiya Jindal","FALSE","Jul 21, 2026 at 2:51:27 PM","Physical Product","prd-R1132103086113-00001815",
+1,ASM-DOOR HINGE V5-LH,SR8-DOR-0008,A.1,xcadmodel-R1132103086113-00005464<1>,true,In Work,Osen Wong,FALSE,"Jul 19, 2026 at 11:18:39 PM",Physical Product,prd-R1132103086113-00001829
+1,ASM-OCCUPANT CELL(Default_speedpak),None,A.1,xcadmodel-R1132103086113-00000058<1>,true,In Work,Aditya Bansal,FALSE,"Jul 18, 2026 at 12:36:43 PM",Physical Product,prd-R1132103086113-00000052
+1,CMT Striker Plate,None,A.1,xcadmodel-R1132103086113-00004811<1>,true,In Work,Jiya Jindal,FALSE,"Jun 14, 2026 at 5:39:12 PM",Physical Product,prd-R1132103086113-00001654
+1,CMT-REAR QUARTER V2-LH,SR8-BDW-0011,A.1,xcadmodel-R1132103086113-00006447<1>,true,In Work,Peleg Cohen,FALSE,"Jul 19, 2026 at 11:15:53 AM",Physical Product,prd-R1132103086113-00002291

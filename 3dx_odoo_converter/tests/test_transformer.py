@@ -1,0 +1,37 @@
+from decimal import Decimal
+from pathlib import Path
+
+from converter.parser import parse_csv
+from converter.transformer import bom_rows, product_external_id, transform
+from converter.validator import validate
+
+
+def test_ids_are_stable_and_duplicates_are_combined(tmp_path: Path) -> None:
+    source = tmp_path / "source.csv"
+    source.write_text(
+        "Level,Title,Enterprise Item Number,Revision,Maturity State,Name\n"
+        "0,Assembly,None,A.1,Released,prd-root\n"
+        "1,Part,CMP-1,A.1,Released,prd-part\n"
+        "1,Part,CMP-1,A.1,Released,prd-part\n", encoding="utf-8"
+    )
+    parsed = parse_csv(source)
+    result = validate(parsed, released_only=False, quantity_column=None, default_quantity=Decimal("1"))
+    products, boms = transform(result, product_type="Goods", bom_type="Manufacture this product",
+                               default_uom="Units")
+    assert product_external_id(parsed.items[0]) == "3dx_product_prd_root"
+    assert len(products) == 2
+    assert len(boms) == 1
+    assert bom_rows(boms)[0][5] == 2
+
+
+def test_missing_engineering_number_uses_name_reference(tmp_path: Path) -> None:
+    source = tmp_path / "source.csv"
+    source.write_text(
+        "Level,Title,Enterprise Item Number,Revision,Maturity State,Name\n"
+        "0,Assembly,None,A.1,Released,prd-root\n", encoding="utf-8"
+    )
+    parsed = parse_csv(source)
+    result = validate(parsed, released_only=False, quantity_column=None, default_quantity=Decimal("1"))
+    products, _ = transform(result, product_type="Goods", bom_type="Manufacture this product",
+                            default_uom="Units")
+    assert products[0].internal_reference == "3DX-prd-root"

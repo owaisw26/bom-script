@@ -1,0 +1,22 @@
+{
+  "product": {
+    "external_id": "External ID",
+    "name": "Name",
+    "internal_reference": "Internal Reference",
+    "product_type": "Product Type",
+    "can_be_sold": "Can be Sold",
+    "can_be_purchased": "Can be Purchased",
+    "uom": "Unit of Measure",
+    "purchase_uom": "Purchase Unit of Measure"
+  },
+  "bom": {
+    "external_id": "External ID",
+    "product_external_id": "Product/External ID",
+    "product_quantity": "Product Quantity",
+    "bom_type": "BoM Type",
+    "component_external_id": "Components/Product/External ID",
+    "component_quantity": "Components/Quantity",
+    "component_uom": "Components/Unit of Measure",
+    "reference": "Reference"
+  }
+}
