@@ -12,11 +12,11 @@
   "bom": {
     "external_id": "External ID",
     "product_external_id": "Product/External ID",
-    "product_quantity": "Product Quantity",
+    "product_quantity": "Quantity",
     "bom_type": "BoM Type",
-    "component_external_id": "Components/Product/External ID",
-    "component_quantity": "Components/Quantity",
-    "component_uom": "Components/Unit of Measure",
+    "component_internal_reference": "BoM Lines/Component",
+    "component_quantity": "BoM Lines/Quantity",
+    "component_uom": "BoM Lines/Unit",
     "reference": "Reference"
   }
 }

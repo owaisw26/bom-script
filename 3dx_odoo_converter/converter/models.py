@@ -31,7 +31,7 @@ class OdooProduct:
 
 @dataclass
 class OdooBomLine:
-    component_external_id: str
+    component_internal_reference: str
     quantity: Decimal
     uom: str
 

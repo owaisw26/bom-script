@@ -69,7 +69,8 @@ def write_report(path: Path, *, source_filename: str, source_rows: int, assembli
         ("Title", product_mapping["name"], "Trimmed source title"),
         ("Enterprise Item Number / Name", product_mapping["internal_reference"], "Engineering number or 3DX-Name"),
         ("Hierarchy parent", bom_mapping["product_external_id"], "Parent product External ID"),
-        ("Hierarchy child", bom_mapping["component_external_id"], "Component product External ID"),
+        ("Hierarchy child", bom_mapping["component_internal_reference"],
+         "Unique component Internal Reference (product variant)"),
         ("Quantity column / default", bom_mapping["component_quantity"], "Configured quantity or assumed default"),
         ("Revision", bom_mapping["external_id"], "Stable 3dx_bom_<parent>_<revision>"),
     ]:

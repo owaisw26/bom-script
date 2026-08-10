@@ -21,6 +21,11 @@ def product_external_id(item: SourceItem) -> str:
     return "3dx_product_" + sanitise(identity(item))
 
 
+def product_internal_reference(item: SourceItem) -> str:
+    """Return the unique reference Odoo exposes on the product variant."""
+    return item.enterprise_item_number or f"3DX-{item.name}"
+
+
 def _decimal_value(value: Decimal) -> int | float:
     """Keep whole quantities tidy in Excel while preserving fractional quantities."""
     return int(value) if value == value.to_integral_value() else float(value)
@@ -38,7 +43,7 @@ def transform(result: ValidationResult, *, product_type: str, bom_type: str,
         if key not in products_by_identity:
             products_by_identity[key] = OdooProduct(
                 external_id=product_external_id(item), name=item.title,
-                internal_reference=item.enterprise_item_number or f"3DX-{item.name}",
+                internal_reference=product_internal_reference(item),
                 product_type=product_type, can_be_sold=False,
                 # Only a Level 0-only record is an assembly-only product.
                 can_be_purchased=item.level > 0, uom=default_uom, purchase_uom=default_uom,
@@ -61,9 +66,9 @@ def transform(result: ValidationResult, *, product_type: str, bom_type: str,
         parent = items_by_row[parent_row]
         combined: dict[str, Decimal] = defaultdict(Decimal)
         for child in child_items:
-            combined[product_external_id(child)] += result.quantities[child.row_number]
-        lines = [OdooBomLine(component_id, quantity, default_uom)
-                 for component_id, quantity in sorted(combined.items())]
+            combined[product_internal_reference(child)] += result.quantities[child.row_number]
+        lines = [OdooBomLine(component_reference, quantity, default_uom)
+                 for component_reference, quantity in sorted(combined.items())]
         reference = f"{parent.enterprise_item_number or parent.title} - Rev {parent.revision}"
         boms.append(OdooBom(
             external_id=f"3dx_bom_{sanitise(identity(parent))}_{sanitise(parent.revision)}",
@@ -83,6 +88,6 @@ def bom_rows(boms: list[OdooBom]) -> list[list[object]]:
     for bom in boms:
         for line in bom.lines:
             rows.append([bom.external_id, bom.product_external_id, _decimal_value(bom.product_quantity),
-                         bom.bom_type, line.component_external_id, _decimal_value(line.quantity),
+                         bom.bom_type, line.component_internal_reference, _decimal_value(line.quantity),
                          line.uom, bom.reference])
     return rows

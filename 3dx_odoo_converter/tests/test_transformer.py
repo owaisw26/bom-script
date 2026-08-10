@@ -2,7 +2,12 @@ from decimal import Decimal
 from pathlib import Path
 
 from converter.parser import parse_csv
-from converter.transformer import bom_rows, product_external_id, transform
+from converter.transformer import (
+    bom_rows,
+    product_external_id,
+    product_internal_reference,
+    transform,
+)
 from converter.validator import validate
 
 
@@ -19,8 +24,10 @@ def test_ids_are_stable_and_duplicates_are_combined(tmp_path: Path) -> None:
     products, boms = transform(result, product_type="Goods", bom_type="Manufacture this product",
                                default_uom="Units")
     assert product_external_id(parsed.items[0]) == "3dx_product_prd_root"
+    assert product_internal_reference(parsed.items[1]) == "CMP-1"
     assert len(products) == 2
     assert len(boms) == 1
+    assert bom_rows(boms)[0][4] == "CMP-1"
     assert bom_rows(boms)[0][5] == 2
 
 
@@ -35,3 +42,4 @@ def test_missing_engineering_number_uses_name_reference(tmp_path: Path) -> None:
     products, _ = transform(result, product_type="Goods", bom_type="Manufacture this product",
                             default_uom="Units")
     assert products[0].internal_reference == "3DX-prd-root"
+    assert product_internal_reference(parsed.items[0]) == "3DX-prd-root"

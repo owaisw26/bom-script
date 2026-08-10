@@ -11,7 +11,7 @@ Running the converter creates three real Excel workbooks in the output directory
 - odoo_bom_import.xlsx — import into Odoo Bills of Materials second.
 - conversion_report.xlsx — review this before importing; it contains summary counts, warnings, rejected rows, and source-to-Odoo mappings.
 
-The product and BoM imports are deliberately separate files because Odoo imports those models separately. All BoM relationships use stable Odoo External IDs, never product names.
+The product and BoM imports are deliberately separate files because Odoo imports those models separately. A BoM's finished product uses its stable Odoo External ID. Component lines use unique Internal References because Odoo stores the imported External ID on `product.template`, while BoM components must resolve to `product.product` variants. Product names are never used as relationship keys.
 
 ## Requirements
 
@@ -81,11 +81,11 @@ Before a production import, export one Product and one BoM from the target Odoo 
 ## Odoo import sequence
 
 1. Open Products in Odoo and import odoo_products_import.xlsx.
-2. Confirm Odoo accepts the configured headers and creates the products.
+2. Confirm Odoo accepts the configured headers and creates the products. This also creates each product's default variant with the same unique Internal Reference.
 3. Open Bills of Materials and import odoo_bom_import.xlsx.
 4. Review created BoMs and component quantities.
 
-Do not import the BoM file first: it refers to product External IDs that must already exist in Odoo.
+Do not import the BoM file first: it refers to the parent product External ID and component Internal References that must already exist in Odoo.
 
 ## Validation and failures
 

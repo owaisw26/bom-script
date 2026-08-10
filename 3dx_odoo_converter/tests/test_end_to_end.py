@@ -24,6 +24,14 @@ def test_supplied_csv_converts_to_expected_workbooks(tmp_path: Path) -> None:
     assert products.max_row == 6
     assert boms.max_row == 5
     assert products[1][0].value == "External ID"
+    assert [cell.value for cell in boms[1]] == [
+        "External ID", "Product/External ID", "Quantity", "BoM Type",
+        "BoM Lines/Component", "BoM Lines/Quantity",
+        "BoM Lines/Unit", "Reference",
+    ]
+    product_references = {row[2] for row in products.iter_rows(min_row=2, values_only=True)}
+    component_references = {row[4] for row in boms.iter_rows(min_row=2, values_only=True)}
+    assert component_references <= product_references
     assert list(products.tables) == ["ProductsImport"]
     assert list(boms.tables) == ["BillsOfMaterialsImport"]
     assert report.sheetnames == ["Summary", "Warnings", "Rejected Rows", "Source Mapping"]

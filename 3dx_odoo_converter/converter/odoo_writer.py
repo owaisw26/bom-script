@@ -13,7 +13,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 PRODUCT_KEYS = ("external_id", "name", "internal_reference", "product_type", "can_be_sold",
                 "can_be_purchased", "uom", "purchase_uom")
 BOM_KEYS = ("external_id", "product_external_id", "product_quantity", "bom_type",
-            "component_external_id", "component_quantity", "component_uom", "reference")
+            "component_internal_reference", "component_quantity", "component_uom", "reference")
 
 
 def load_mapping(path: Path) -> dict[str, dict[str, str]]:
