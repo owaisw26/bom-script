@@ -36,6 +36,11 @@ def _key(value: str) -> str:
     return " ".join(value.split()).casefold()
 
 
+def _header(headers: list[str], *candidates: str) -> str | None:
+    """Return the first available display or Odoo technical field name."""
+    return next((candidate for candidate in candidates if candidate in headers), None)
+
+
 def _csv_rows(path: Path) -> tuple[list[str], list[tuple[int, dict[str, object]]]]:
     with path.open("r", encoding="utf-8-sig", newline="") as source:
         reader = csv.DictReader(source)
@@ -65,22 +70,24 @@ def load_existing_products(path: Path, product_mapping: dict[str, str]) -> list[
     else:
         raise ValueError("Existing-products export must be a .csv or .xlsx file")
 
-    external_header = product_mapping["external_id"]
-    name_header = product_mapping["name"]
-    reference_header = product_mapping["internal_reference"]
-    if external_header not in headers:
-        raise ValueError(f"Existing-products export is missing required column '{external_header}'")
-    if name_header not in headers and reference_header not in headers:
+    external_header = _header(headers, product_mapping["external_id"], "External ID", "id")
+    name_header = _header(headers, product_mapping["name"], "Name", "name")
+    reference_header = _header(
+        headers, product_mapping["internal_reference"], "Internal Reference", "default_code"
+    )
+    if external_header is None:
+        raise ValueError("Existing-products export is missing External ID (id)")
+    if name_header is None and reference_header is None:
         raise ValueError(
-            f"Existing-products export must contain '{name_header}' or '{reference_header}'"
+            "Existing-products export must contain Name (name) or Internal Reference (default_code)"
         )
 
     products: list[ExistingProduct] = []
     seen_external_ids: set[str] = set()
     for row_number, row in rows:
         external_id = _text(row.get(external_header))
-        name = _text(row.get(name_header))
-        internal_reference = _text(row.get(reference_header))
+        name = _text(row.get(name_header)) if name_header else ""
+        internal_reference = _text(row.get(reference_header)) if reference_header else ""
         if not external_id and not name and not internal_reference:
             continue
         if not external_id:

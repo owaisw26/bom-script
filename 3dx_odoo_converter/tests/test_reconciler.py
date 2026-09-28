@@ -25,6 +25,26 @@ def test_existing_products_can_be_loaded_from_xlsx(tmp_path: Path) -> None:
     assert products == [ExistingProduct("__export__.product_template_42", "Assembly", "ASM-42", 2)]
 
 
+def test_odoo_technical_export_headers_are_supported(tmp_path: Path) -> None:
+    path = tmp_path / "odoo_export.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["id", "name", "default_code", "id"])
+    sheet.append([
+        "__import__.3dx_product_prd_root", "Assembly", "3DX-prd-root",
+        "__import__.3dx_product_prd_root",
+    ])
+    workbook.save(path)
+
+    products = load_existing_products(path, {
+        "external_id": "External ID", "name": "Name", "internal_reference": "Internal Reference",
+    })
+
+    assert products == [ExistingProduct(
+        "__import__.3dx_product_prd_root", "Assembly", "3DX-prd-root", 2,
+    )]
+
+
 def test_existing_assembly_external_id_is_reused_in_product_and_bom() -> None:
     products = [product("Assembly", "3DX-prd-root", "3dx_product_prd_root")]
     boms = [OdooBom("3dx_bom_root_A1", "3dx_product_prd_root", 1, "Manufacture this product",
