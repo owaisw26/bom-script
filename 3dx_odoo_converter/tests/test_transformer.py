@@ -28,8 +28,9 @@ def test_ids_are_stable_and_duplicates_are_combined(tmp_path: Path) -> None:
     assert product_internal_reference(parsed.items[1]) == "CMP-1"
     assert len(products) == 2
     assert len(boms) == 1
-    assert bom_rows(boms)[0][4] == "CMP-1"
-    assert bom_rows(boms)[0][5] == 2
+    assert bom_rows(boms)[0][4] == "3dx_bom_prd_root_A1_line_CMP_1"
+    assert bom_rows(boms)[0][5] == "CMP-1"
+    assert bom_rows(boms)[0][6] == 2
 
 
 def test_missing_engineering_number_uses_name_reference(tmp_path: Path) -> None:

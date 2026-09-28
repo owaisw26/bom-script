@@ -26,12 +26,15 @@ def test_supplied_csv_converts_to_expected_workbooks(tmp_path: Path) -> None:
     assert products[1][0].value == "External ID"
     assert [cell.value for cell in boms[1]] == [
         "External ID", "Product/External ID", "Quantity", "BoM Type",
-        "BoM Lines/Component", "BoM Lines/Quantity",
+        "BoM Lines/External ID", "BoM Lines/Component", "BoM Lines/Quantity",
         "BoM Lines/Unit", "Reference",
     ]
     product_references = {row[2] for row in products.iter_rows(min_row=2, values_only=True)}
-    component_references = {row[4] for row in boms.iter_rows(min_row=2, values_only=True)}
+    component_references = {row[5] for row in boms.iter_rows(min_row=2, values_only=True)}
     assert component_references <= product_references
+    line_external_ids = [row[4] for row in boms.iter_rows(min_row=2, values_only=True)]
+    assert len(line_external_ids) == len(set(line_external_ids))
+    assert all(value.startswith("3dx_bom_") for value in line_external_ids)
     assert list(products.tables) == ["ProductsImport"]
     assert list(boms.tables) == ["BillsOfMaterialsImport"]
     assert report.sheetnames == ["Summary", "Warnings", "Rejected Rows", "Source Mapping"]

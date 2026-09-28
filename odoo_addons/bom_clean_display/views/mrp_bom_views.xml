@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mrp_bom_form_hide_internal_reference" model="ir.ui.view">
+        <field name="name">mrp.bom.form.hide.internal.reference</field>
+        <field name="model">mrp.bom</field>
+        <field name="inherit_id" ref="mrp.mrp_bom_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_tmpl_id']" position="attributes">
+                <attribute name="context">{'default_is_storable': True, 'display_default_code': False}</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_id'][@groups='product.group_product_variant']" position="attributes">
+                <attribute name="context">{'default_is_storable': True, 'display_default_code': False}</attribute>
+            </xpath>
+            <xpath expr="//field[@name='bom_line_ids']//field[@name='product_id']" position="attributes">
+                <attribute name="context">{'default_is_storable': True, 'display_default_code': False}</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="mrp_bom_list_hide_internal_reference" model="ir.ui.view">
+        <field name="name">mrp.bom.list.hide.internal.reference</field>
+        <field name="model">mrp.bom</field>
+        <field name="inherit_id" ref="mrp.mrp_bom_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_tmpl_id']" position="attributes">
+                <attribute name="context">{'display_default_code': False}</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_id']" position="attributes">
+                <attribute name="context">{'display_default_code': False}</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

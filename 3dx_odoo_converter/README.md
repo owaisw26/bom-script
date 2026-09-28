@@ -79,6 +79,11 @@ Successful output looks like:
 
 Repeated immediate component lines are combined. For example, three occurrences of the same component with the default quantity of 1 become one BoM component line with quantity 3.
 
+Every BoM component line receives a stable External ID. After the first clean import, importing the
+same converted BoM again updates its component lines instead of appending duplicates. BoMs imported
+with an older converter version must be deleted and imported once with the new file to seed these
+line identifiers.
+
 The 3DEXPERIENCE representation suffix `(Default_speedpak)` is removed from product names. It is technical representation metadata rather than part of the user-facing product title.
 
 ## Configure Odoo headers
@@ -97,7 +102,8 @@ carries the exported External IDs into both output workbooks.
 1. Open Products in Odoo and import odoo_products_import.xlsx.
 2. Confirm Odoo updates the matched assembly stubs and creates only genuinely new products. This also creates each new product's default variant with the same unique Internal Reference.
 3. Open Bills of Materials and import odoo_bom_import.xlsx.
-4. Review created BoMs and component quantities.
+4. Map `BoM Lines/External ID` as well as the other automatically detected columns.
+5. Review created BoMs and component quantities.
 
 Do not import the BoM file first: it refers to the parent product External ID and component Internal References that must already exist in Odoo.
 

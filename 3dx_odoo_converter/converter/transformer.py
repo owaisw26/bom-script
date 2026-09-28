@@ -75,11 +75,15 @@ def transform(result: ValidationResult, *, product_type: str, bom_type: str,
         combined: dict[str, Decimal] = defaultdict(Decimal)
         for child in child_items:
             combined[product_internal_reference(child)] += result.quantities[child.row_number]
-        lines = [OdooBomLine(component_reference, quantity, default_uom)
+        bom_external_id = f"3dx_bom_{sanitise(identity(parent))}_{sanitise(parent.revision)}"
+        lines = [OdooBomLine(
+                    f"{bom_external_id}_line_{sanitise(component_reference)}",
+                    component_reference, quantity, default_uom,
+                 )
                  for component_reference, quantity in sorted(combined.items())]
         reference = f"{parent.enterprise_item_number or parent.title} - Rev {parent.revision}"
         boms.append(OdooBom(
-            external_id=f"3dx_bom_{sanitise(identity(parent))}_{sanitise(parent.revision)}",
+            external_id=bom_external_id,
             product_external_id=product_external_id(parent), product_quantity=Decimal("1"),
             bom_type=bom_type, reference=reference, lines=lines,
         ))
@@ -96,6 +100,6 @@ def bom_rows(boms: list[OdooBom]) -> list[list[object]]:
     for bom in boms:
         for line in bom.lines:
             rows.append([bom.external_id, bom.product_external_id, _decimal_value(bom.product_quantity),
-                         bom.bom_type, line.component_internal_reference, _decimal_value(line.quantity),
-                         line.uom, bom.reference])
+                         bom.bom_type, line.external_id, line.component_internal_reference,
+                         _decimal_value(line.quantity), line.uom, bom.reference])
     return rows
