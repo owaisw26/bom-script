@@ -29,7 +29,8 @@ def _format(sheet, table_name: str) -> None:
 
 def write_report(path: Path, *, source_filename: str, source_rows: int, assemblies: int,
                  products: int, component_lines: int, missing_item_numbers: int,
-                 assumed_quantities: int, non_released: int, warnings: list[ValidationWarning],
+                 assumed_quantities: int, non_released: int, matched_existing_products: int,
+                 matched_existing_assemblies: int, warnings: list[ValidationWarning],
                  rejected_rows: list[RejectedRow], source_headers: list[str],
                  product_mapping: dict[str, str], bom_mapping: dict[str, str]) -> None:
     workbook = Workbook()
@@ -43,6 +44,8 @@ def write_report(path: Path, *, source_filename: str, source_rows: int, assembli
         ("Number of missing Enterprise Item Numbers", missing_item_numbers),
         ("Number of assumed quantities", assumed_quantities),
         ("Number of non-released items", non_released),
+        ("Number of existing Odoo products matched", matched_existing_products),
+        ("Number of existing Odoo assemblies matched", matched_existing_assemblies),
         ("Number of rejected rows", len(rejected_rows)),
         ("Conversion timestamp", datetime.now(timezone.utc).isoformat()),
     ]:
@@ -65,8 +68,9 @@ def write_report(path: Path, *, source_filename: str, source_rows: int, assembli
     mapping_sheet = workbook.create_sheet("Source Mapping")
     mapping_sheet.append(["Source column", "Odoo field", "Transformation rule"])
     for source, field, rule in [
-        ("Enterprise Item Number / Name", product_mapping["external_id"], "Stable 3dx_product_<identifier>"),
-        ("Title", product_mapping["name"], "Trimmed source title"),
+        ("Enterprise Item Number / Name", product_mapping["external_id"],
+         "Existing Odoo External ID when matched; otherwise stable 3dx_product_<identifier>"),
+        ("Title", product_mapping["name"], "Trimmed title; trailing (Default_speedpak) removed"),
         ("Enterprise Item Number / Name", product_mapping["internal_reference"], "Engineering number or 3DX-Name"),
         ("Hierarchy parent", bom_mapping["product_external_id"], "Parent product External ID"),
         ("Hierarchy child", bom_mapping["component_internal_reference"],

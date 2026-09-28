@@ -42,9 +42,11 @@ Successful output looks like:
 
     Conversion completed.
 
-    Products created: 5
+    Product rows exported: 5
     BoMs created: 1
     BoM component lines: 4
+    Existing products matched: 0
+    Existing assemblies matched: 0
     Warnings: 12
     Rejected rows: 0
 
@@ -63,14 +65,21 @@ Successful output looks like:
       --default-uom Units
       --product-type Goods
       --bom-type "Manufacture this product"
+      --existing-products ./odoo_existing_products.xlsx
       --field-mapping ./odoo_field_mapping.json
 
 - --released-only accepts only Released data. A non-released Level 0 assembly stops the conversion. Non-released components are excluded and reported.
 - --quantity-column names a future CSV quantity column. Values must be positive numbers. Without it, each component occurrence uses --default-quantity and the report warns that the quantity was assumed.
 - --product-type and --bom-type accommodate differing Odoo version labels.
 - --default-uom is written to both Odoo UoM fields.
+- --existing-products reconciles converted products with an Odoo product export. It reuses the
+  existing External IDs so product rows update the stubs and BoMs attach to those records. It
+  matches Internal Reference first, then a unique exact Name. If any assembly is missing or
+  ambiguous, conversion stops rather than creating a duplicate assembly.
 
 Repeated immediate component lines are combined. For example, three occurrences of the same component with the default quantity of 1 become one BoM component line with quantity 3.
+
+The 3DEXPERIENCE representation suffix `(Default_speedpak)` is removed from product names. It is technical representation metadata rather than part of the user-facing product title.
 
 ## Configure Odoo headers
 
@@ -80,8 +89,13 @@ Before a production import, export one Product and one BoM from the target Odoo 
 
 ## Odoo import sequence
 
+If assembly stubs already exist, first export them from Odoo with these columns: `External ID`,
+`Name`, and `Internal Reference`. Select **I want to update data (import-compatible export)** and
+export as CSV. Run the converter with `--existing-products` pointing to that export. The converter
+carries the exported External IDs into both output workbooks.
+
 1. Open Products in Odoo and import odoo_products_import.xlsx.
-2. Confirm Odoo accepts the configured headers and creates the products. This also creates each product's default variant with the same unique Internal Reference.
+2. Confirm Odoo updates the matched assembly stubs and creates only genuinely new products. This also creates each new product's default variant with the same unique Internal Reference.
 3. Open Bills of Materials and import odoo_bom_import.xlsx.
 4. Review created BoMs and component quantities.
 

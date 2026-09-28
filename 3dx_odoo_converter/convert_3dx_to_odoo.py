@@ -10,6 +10,7 @@ from pathlib import Path
 
 from converter.odoo_writer import BOM_KEYS, PRODUCT_KEYS, load_mapping, write_import_workbook
 from converter.parser import parse_csv
+from converter.reconciler import load_existing_products, reconcile_existing_products
 from converter.report_writer import write_report
 from converter.transformer import bom_rows, product_rows, transform
 from converter.validator import validate
@@ -39,6 +40,11 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--product-type", default="Goods")
     parser.add_argument("--bom-type", default="Manufacture this product")
     parser.add_argument(
+        "--existing-products", type=Path,
+        help=("Odoo product export (.csv or .xlsx) containing External ID plus Name and/or "
+              "Internal Reference. Existing assemblies are updated instead of duplicated."),
+    )
+    parser.add_argument(
         "--field-mapping", type=Path,
         default=Path(__file__).with_name("odoo_field_mapping.json"),
         help="Path to the configurable Odoo field-header mapping JSON",
@@ -50,6 +56,9 @@ def main() -> int:
     args = arguments()
     if not args.input_csv.is_file():
         print(f"Error: input CSV not found: {args.input_csv}", file=sys.stderr)
+        return 2
+    if args.existing_products and not args.existing_products.is_file():
+        print(f"Error: existing-products export not found: {args.existing_products}", file=sys.stderr)
         return 2
     try:
         mapping = load_mapping(args.field_mapping)
@@ -65,6 +74,19 @@ def main() -> int:
     # Transforming valid data lets the report show useful counts even on an atomic failure.
     products, boms = transform(result, product_type=args.product_type, bom_type=args.bom_type,
                                default_uom=args.default_uom)
+    matched_existing_products = 0
+    matched_existing_assemblies = 0
+    if args.existing_products:
+        try:
+            existing_products = load_existing_products(args.existing_products, mapping["product"])
+            reconciliation = reconcile_existing_products(products, boms, existing_products)
+        except (OSError, ValueError) as error:
+            result.errors.append(f"Invalid existing-products export: {error}")
+        else:
+            matched_existing_products = reconciliation.matched_products
+            matched_existing_assemblies = reconciliation.matched_assemblies
+            result.warnings.extend(reconciliation.warnings)
+            result.errors.extend(reconciliation.errors)
     source_rows = len(parsed.items) + len(parsed.rejected_rows)
     non_released = sum(item.maturity_state != "Released" for item in parsed.items)
     missing_item_numbers = sum(not item.enterprise_item_number for item in parsed.items)
@@ -77,6 +99,8 @@ def main() -> int:
         assemblies=sum(item.level == 0 for item in result.items), products=len(products),
         component_lines=sum(len(bom.lines) for bom in boms), missing_item_numbers=missing_item_numbers,
         assumed_quantities=assumed_quantities, non_released=non_released,
+        matched_existing_products=matched_existing_products,
+        matched_existing_assemblies=matched_existing_assemblies,
         warnings=result.warnings, rejected_rows=result.rejected_rows, source_headers=parsed.fieldnames,
         product_mapping=mapping["product"], bom_mapping=mapping["bom"],
     )
@@ -95,9 +119,11 @@ def main() -> int:
                           [mapping["bom"][key] for key in BOM_KEYS],
                           bom_rows(boms), "BillsOfMaterialsImport")
     print("\\nConversion completed.\\n")
-    print(f"Products created: {len(products)}")
+    print(f"Product rows exported: {len(products)}")
     print(f"BoMs created: {len(boms)}")
     print(f"BoM component lines: {sum(len(bom.lines) for bom in boms)}")
+    print(f"Existing products matched: {matched_existing_products}")
+    print(f"Existing assemblies matched: {matched_existing_assemblies}")
     print(f"Warnings: {len(result.warnings)}")
     print(f"Rejected rows: {len(result.rejected_rows)}\\n")
     print("Files:")

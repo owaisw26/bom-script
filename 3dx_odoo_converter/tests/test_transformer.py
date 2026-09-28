@@ -6,6 +6,7 @@ from converter.transformer import (
     bom_rows,
     product_external_id,
     product_internal_reference,
+    product_name,
     transform,
 )
 from converter.validator import validate
@@ -43,3 +44,19 @@ def test_missing_engineering_number_uses_name_reference(tmp_path: Path) -> None:
                             default_uom="Units")
     assert products[0].internal_reference == "3DX-prd-root"
     assert product_internal_reference(parsed.items[0]) == "3DX-prd-root"
+
+
+def test_default_speedpak_suffix_is_removed_from_product_name(tmp_path: Path) -> None:
+    source = tmp_path / "source.csv"
+    source.write_text(
+        "Level,Title,Enterprise Item Number,Revision,Maturity State,Name\n"
+        "0,ASM-OCCUPANT CELL(Default_speedpak),None,A.1,Released,prd-root\n",
+        encoding="utf-8",
+    )
+    parsed = parse_csv(source)
+    result = validate(parsed, released_only=False, quantity_column=None, default_quantity=Decimal("1"))
+    products, _ = transform(result, product_type="Goods", bom_type="Manufacture this product",
+                            default_uom="Units")
+
+    assert product_name(parsed.items[0]) == "ASM-OCCUPANT CELL"
+    assert products[0].name == "ASM-OCCUPANT CELL"

@@ -10,6 +10,14 @@ from .models import OdooBom, OdooBomLine, OdooProduct, SourceItem
 from .validator import ValidationResult, identity
 
 
+DEFAULT_SPEEDPAK_SUFFIX = re.compile(r"\s*\(\s*default_speedpak\s*\)\s*$", re.IGNORECASE)
+
+
+def product_name(item: SourceItem) -> str:
+    """Return the user-facing title without 3DEXPERIENCE representation metadata."""
+    return DEFAULT_SPEEDPAK_SUFFIX.sub("", item.title).strip()
+
+
 def sanitise(value: str) -> str:
     """Make a stable External ID suffix from a 3DEXPERIENCE identifier."""
     value = re.sub(r"[\s-]+", "_", value.strip())
@@ -42,7 +50,7 @@ def transform(result: ValidationResult, *, product_type: str, bom_type: str,
         key = identity(item)
         if key not in products_by_identity:
             products_by_identity[key] = OdooProduct(
-                external_id=product_external_id(item), name=item.title,
+                external_id=product_external_id(item), name=product_name(item),
                 internal_reference=product_internal_reference(item),
                 product_type=product_type, can_be_sold=False,
                 # Only a Level 0-only record is an assembly-only product.
