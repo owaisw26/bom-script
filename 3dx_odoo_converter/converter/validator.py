@@ -38,7 +38,7 @@ def _quantity(item: SourceItem, column: str | None, default: Decimal,
         return default
     try:
         quantity = Decimal(value)
-        if quantity <= 0:
+        if not quantity.is_finite() or quantity <= 0:
             raise InvalidOperation
         return quantity
     except InvalidOperation:
@@ -60,24 +60,34 @@ def validate(parsed: ParsedSource, *, released_only: bool, quantity_column: str 
     excluded_rows: set[int] = set()
     roots = [item for item in parsed.items if item.level == 0]
     if released_only:
-        for root in roots:
-            if root.maturity_state != "Released":
-                errors.append(f"Parent assembly on row {root.row_number} is not Released")
+        # Hold an entire installation when any descendant is immature. Exporting
+        # only its released children would produce an incomplete manufacturing BoM.
+        root_for_row: dict[int, int] = {}
+        current_root: int | None = None
         for item in parsed.items:
-            parent_excluded = item.parent_row_number in excluded_rows
-            if item.maturity_state != "Released":
+            if item.level == 0:
+                current_root = item.row_number
+            if current_root is not None:
+                root_for_row[item.row_number] = current_root
+        blocked_roots = {root_for_row[item.row_number] for item in parsed.items
+                         if item.row_number in root_for_row and item.maturity_state != "Released"}
+        for item in parsed.items:
+            if root_for_row.get(item.row_number) in blocked_roots:
                 excluded_rows.add(item.row_number)
-                if item.level > 0:
-                    warnings.append(ValidationWarning(item.row_number, "Item is not released; component excluded"))
-            elif parent_excluded:
-                excluded_rows.add(item.row_number)
-                warnings.append(ValidationWarning(item.row_number, "Item excluded because its parent is not released"))
+                if item.maturity_state != "Released":
+                    warnings.append(ValidationWarning(item.row_number,
+                        "Item is not Released; installation held from Odoo export"))
+        if roots and len(blocked_roots) == len(roots):
+            errors.append("No fully Released installation is available for Odoo export")
     else:
         for item in parsed.items:
             if item.maturity_state != "Released":
                 warnings.append(ValidationWarning(item.row_number, "Item is not released"))
 
     items = [item for item in parsed.items if item.row_number not in excluded_rows]
+    for item in parsed.items:
+        if "drawing" in item.source_row.get("Type", "").casefold():
+            errors.append(f"Row {item.row_number} is a drawing; export installations instead")
     for item in items:
         if not item.enterprise_item_number:
             warnings.append(ValidationWarning(

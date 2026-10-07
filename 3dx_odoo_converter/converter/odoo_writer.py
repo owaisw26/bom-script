@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -58,3 +59,14 @@ def write_import_workbook(path: Path, worksheet_name: str, headers: list[str],
         sheet.append(row)
     _format_sheet(sheet, table_name)
     workbook.save(path)
+
+
+def write_import_csv(path: Path, headers: list[str], rows: list[list[object]]) -> None:
+    """Write the same Odoo import columns in CSV form for staged imports."""
+    with path.open("w", encoding="utf-8-sig", newline="") as target:
+        writer = csv.writer(target)
+        writer.writerow(headers)
+        for row in rows:
+            if len(row) != len(headers) or any(value is None or value == "" for value in row):
+                raise ValueError("Output CSV contains a blank required cell")
+            writer.writerow(row)

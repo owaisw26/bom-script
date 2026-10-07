@@ -1,3 +1,4 @@
+import csv
 import subprocess
 import sys
 from pathlib import Path
@@ -9,9 +10,17 @@ PROJECT = Path(__file__).resolve().parents[1]
 SAMPLE = PROJECT.parent / "ASM-DOORS INSTALLATION.csv"
 
 
+def released_sample(tmp_path: Path) -> Path:
+    source = tmp_path / "released-installation.csv"
+    source.write_text(SAMPLE.read_text(encoding="utf-8-sig").replace("In Work", "Released"),
+                      encoding="utf-8")
+    return source
+
+
 def test_supplied_csv_converts_to_expected_workbooks(tmp_path: Path) -> None:
     completed = subprocess.run(
-        [sys.executable, "convert_3dx_to_odoo.py", str(SAMPLE), "--output-dir", str(tmp_path)],
+        [sys.executable, "convert_3dx_to_odoo.py", str(released_sample(tmp_path)),
+         "--output-dir", str(tmp_path)],
         cwd=PROJECT, text=True, capture_output=True, check=False,
     )
     assert completed.returncode == 0, completed.stderr
@@ -23,6 +32,14 @@ def test_supplied_csv_converts_to_expected_workbooks(tmp_path: Path) -> None:
     assert boms.title == "Bills of Materials"
     assert products.max_row == 6
     assert boms.max_row == 5
+    with (tmp_path / "odoo_products_import.csv").open(encoding="utf-8-sig", newline="") as stream:
+        csv_products = list(csv.reader(stream))
+    with (tmp_path / "odoo_bom_import.csv").open(encoding="utf-8-sig", newline="") as stream:
+        csv_boms = list(csv.reader(stream))
+    assert len(csv_products) == products.max_row
+    assert len(csv_boms) == boms.max_row
+    assert csv_products[0] == [cell.value for cell in products[1]]
+    assert csv_boms[0] == [cell.value for cell in boms[1]]
     assert products[1][0].value == "External ID"
     assert [cell.value for cell in boms[1]] == [
         "External ID", "Product/External ID", "Quantity", "BoM Type",
@@ -37,7 +54,7 @@ def test_supplied_csv_converts_to_expected_workbooks(tmp_path: Path) -> None:
     assert all(value.startswith("3dx_bom_") for value in line_external_ids)
     assert list(products.tables) == ["ProductsImport"]
     assert list(boms.tables) == ["BillsOfMaterialsImport"]
-    assert report.sheetnames == ["Summary", "Warnings", "Rejected Rows", "Source Mapping"]
+    assert report.sheetnames == ["Summary", "Warnings", "Rejected Rows", "Source Mapping", "Procurement"]
 
 
 def test_existing_assembly_stub_is_updated_instead_of_duplicated(tmp_path: Path) -> None:
@@ -50,7 +67,7 @@ def test_existing_assembly_stub_is_updated_instead_of_duplicated(tmp_path: Path)
     output = tmp_path / "output"
     completed = subprocess.run(
         [
-            sys.executable, "convert_3dx_to_odoo.py", str(SAMPLE),
+            sys.executable, "convert_3dx_to_odoo.py", str(released_sample(tmp_path)),
             "--existing-products", str(existing), "--output-dir", str(output),
         ],
         cwd=PROJECT, text=True, capture_output=True, check=False,
@@ -77,7 +94,7 @@ def test_reconciliation_refuses_to_create_a_missing_assembly(tmp_path: Path) -> 
     output = tmp_path / "output"
     completed = subprocess.run(
         [
-            sys.executable, "convert_3dx_to_odoo.py", str(SAMPLE),
+            sys.executable, "convert_3dx_to_odoo.py", str(released_sample(tmp_path)),
             "--existing-products", str(existing), "--output-dir", str(output),
         ],
         cwd=PROJECT, text=True, capture_output=True, check=False,
@@ -88,3 +105,17 @@ def test_reconciliation_refuses_to_create_a_missing_assembly(tmp_path: Path) -> 
     assert not (output / "odoo_products_import.xlsx").exists()
     assert not (output / "odoo_bom_import.xlsx").exists()
     assert (output / "conversion_report.xlsx").is_file()
+
+
+def test_in_work_sample_never_creates_odoo_imports(tmp_path: Path) -> None:
+    completed = subprocess.run(
+        [sys.executable, "convert_3dx_to_odoo.py", str(SAMPLE), "--output-dir", str(tmp_path)],
+        cwd=PROJECT, text=True, capture_output=True, check=False,
+    )
+    assert completed.returncode == 1
+    assert "No fully Released installation" in completed.stderr
+    assert not (tmp_path / "odoo_products_import.xlsx").exists()
+    assert not (tmp_path / "odoo_bom_import.xlsx").exists()
+    assert not (tmp_path / "odoo_products_import.csv").exists()
+    assert not (tmp_path / "odoo_bom_import.csv").exists()
+    assert (tmp_path / "conversion_report.xlsx").exists()

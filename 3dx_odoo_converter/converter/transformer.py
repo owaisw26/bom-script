@@ -44,8 +44,6 @@ def transform(result: ValidationResult, *, product_type: str, bom_type: str,
     """Create deduplicated products and one BoM for every parent with children."""
     items_by_row = {item.row_number: item for item in result.items}
     products_by_identity: dict[str, OdooProduct] = {}
-    component_rows = {item.row_number for item in result.items if item.parent_row_number is not None}
-
     for item in result.items:
         key = identity(item)
         if key not in products_by_identity:
@@ -53,16 +51,8 @@ def transform(result: ValidationResult, *, product_type: str, bom_type: str,
                 external_id=product_external_id(item), name=product_name(item),
                 internal_reference=product_internal_reference(item),
                 product_type=product_type, can_be_sold=False,
-                # Only a Level 0-only record is an assembly-only product.
-                can_be_purchased=item.level > 0, uom=default_uom, purchase_uom=default_uom,
+                can_be_purchased=False, uom=default_uom, purchase_uom=default_uom,
             )
-        elif item.row_number in component_rows:
-            products_by_identity[key].can_be_purchased = True
-
-    # A root product may be seen first, then later re-used as a component.
-    for item in result.items:
-        if item.row_number in component_rows:
-            products_by_identity[identity(item)].can_be_purchased = True
 
     children: dict[int, list[SourceItem]] = defaultdict(list)
     for item in result.items:

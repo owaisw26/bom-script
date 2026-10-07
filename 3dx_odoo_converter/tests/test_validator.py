@@ -14,7 +14,7 @@ def test_released_only_rejects_an_unreleased_parent(tmp_path: Path) -> None:
     )
     result = validate(parse_csv(path), released_only=True, quantity_column=None,
                       default_quantity=Decimal("1"))
-    assert any("not Released" in error for error in result.errors)
+    assert any("No fully Released installation" in error for error in result.errors)
 
 
 def test_quantity_column_must_be_positive(tmp_path: Path) -> None:

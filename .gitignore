@@ -6,3 +6,4 @@ __pycache__/
 
 # Converter output is generated and should not be versioned.
 odoo_output/
+outputs/

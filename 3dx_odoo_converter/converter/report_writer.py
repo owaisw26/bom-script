@@ -32,13 +32,16 @@ def write_report(path: Path, *, source_filename: str, source_rows: int, assembli
                  assumed_quantities: int, non_released: int, matched_existing_products: int,
                  matched_existing_assemblies: int, warnings: list[ValidationWarning],
                  rejected_rows: list[RejectedRow], source_headers: list[str],
-                 product_mapping: dict[str, str], bom_mapping: dict[str, str]) -> None:
+                 product_mapping: dict[str, str], bom_mapping: dict[str, str],
+                 project_id: str = "", procurement_rows: list[list[object]] | None = None,
+                 procurement_exported: int = 0) -> None:
     workbook = Workbook()
     summary = workbook.active
     summary.title = "Summary"
     summary.append(["Metric", "Value"])
     for metric, value in [
         ("Source filename", source_filename), ("Number of source rows", source_rows),
+        ("Project ID", project_id),
         ("Number of assemblies", assemblies), ("Number of unique products", products),
         ("Number of component lines", component_lines),
         ("Number of missing Enterprise Item Numbers", missing_item_numbers),
@@ -47,6 +50,7 @@ def write_report(path: Path, *, source_filename: str, source_rows: int, assembli
         ("Number of existing Odoo products matched", matched_existing_products),
         ("Number of existing Odoo assemblies matched", matched_existing_assemblies),
         ("Number of rejected rows", len(rejected_rows)),
+        ("Manual procurement rows exported", procurement_exported),
         ("Conversion timestamp", datetime.now(timezone.utc).isoformat()),
     ]:
         summary.append([metric, value])
@@ -82,4 +86,12 @@ def write_report(path: Path, *, source_filename: str, source_rows: int, assembli
     ]:
         mapping_sheet.append([source, field, rule])
     _format(mapping_sheet, "SourceMappingTable")
+    if procurement_rows is not None:
+        procurement_sheet = workbook.create_sheet("Procurement")
+        procurement_sheet.append(["Source Row", "Project ID", "Parent Reference",
+                                  "Internal Reference", "Name", "Quantity", "Unit of Measure",
+                                  "Status", "Disposition", "Reason", "Product External ID"])
+        for row in procurement_rows:
+            procurement_sheet.append(row)
+        _format(procurement_sheet, "ProcurementTable")
     workbook.save(path)
