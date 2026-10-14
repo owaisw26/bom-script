@@ -1,7 +1,10 @@
 # 3DEXPERIENCE to Odoo converter
-This has been written using the help of AI, let me know if any issues do arise during set-up cheers. 
+
+> **Handover status (October 2026):** The file-based converter and automated tests are working. It has not yet been validated against the team's Odoo database with a real Released installation. Use a test database and review the generated audit report before wider use.
 
 This command-line tool converts a 3DEXPERIENCE **installation product-structure** CSV into separate Odoo product and Bill of Materials (BoM) CSV and XLSX import files. It also creates an audit report so quantity assumptions, release-state holds, manual procurement entries, and invalid rows are visible before anything is imported. The CSV workflow is the first connector step; it does not connect to either service's API.
+
+For a quick repository overview, see the [root README](../README.md). This guide contains the full input contract, converter behaviour, codebase map, and Odoo import procedure.
 
 ## What it creates
 
@@ -41,6 +44,13 @@ From the 3dx_odoo_converter directory:
 
 The supplied sample has one Level 0 assembly and four Level 1 components. It is entirely **In Work**, so this command writes only `conversion_report.xlsx` and exits with an error. That is expected: no Odoo import files are produced until the entire installation branch is `Released`. Use a real released installation export for a successful import run. Export **installations / physical product structures**, not drawing records.
 
+For a real Released installation, point the command at that export. Keep each run's files together in one output directory:
+
+    python convert_3dx_to_odoo.py "/path/to/RELEASED INSTALLATION.csv" \
+      --project-id PROJECT-123 --output-dir ./odoo_output
+
+If the source contains approved quantities, add `--quantity-column` with the exact CSV header. Do not change an item's 3DEXPERIENCE maturity state solely to make the converter accept it.
+
 Successful output looks like:
 
     Conversion completed.
@@ -62,16 +72,18 @@ Successful output looks like:
 
 ## Options
 
-    python convert_3dx_to_odoo.py input.csv
-      --output-dir ./output
-      --project-id PROJECT-123
-      --procurement-csv ./manual_procurement.csv
-      --default-quantity 1
-      --quantity-column Quantity
-      --default-uom Units
-      --product-type Goods
-      --bom-type "Manufacture this product"
-      --existing-products ./odoo_existing_products.xlsx
+This example shows the available settings; use only the options relevant to your run:
+
+    python convert_3dx_to_odoo.py input.csv \
+      --output-dir ./output \
+      --project-id PROJECT-123 \
+      --procurement-csv ./manual_procurement.csv \
+      --default-quantity 1 \
+      --quantity-column Quantity \
+      --default-uom Units \
+      --product-type Goods \
+      --bom-type "Manufacture this product" \
+      --existing-products ./odoo_existing_products.xlsx \
       --field-mapping ./odoo_field_mapping.json
 
 - Release gating is always on. An installation is held if its root or any descendant is not `Released`; the converter never exports a partial installation BoM. If no installation is fully released, it creates only the audit report. `--released-only` is accepted for old scripts but is now redundant.
@@ -86,6 +98,65 @@ Successful output looks like:
   ambiguous, conversion stops rather than creating a duplicate assembly.
 
 Repeated immediate component lines are combined. For example, three occurrences of the same component with the default quantity of 1 become one BoM component line with quantity 3.
+
+## How the conversion works
+
+### Source data and hierarchy
+
+The source must be a UTF-8 CSV export of an **installation / physical product structure**, with these exact column names:
+
+| Required column | How the converter uses it |
+| --- | --- |
+| `Level` | `0` starts an installation; each higher level belongs to its nearest parent at the preceding level. A child without that parent is rejected. |
+| `Name` | 3DEXPERIENCE identifier used when an Enterprise Item Number is missing. |
+| `Title` | Product name shown in Odoo. A trailing `(Default_speedpak)` suffix is removed. |
+| `Revision` | Included in the generated BoM External ID and its reference. |
+| `Enterprise Item Number` | Preferred product identity and Internal Reference. If blank, `Name` must be present. |
+| `Maturity State` | Must be exactly `Released` for an installation branch to enter an Odoo import. |
+
+An optional `Type` column is checked for drawing records. If it identifies a drawing, conversion stops: export the installation structure instead. An optional quantity column is read only when its name is passed through `--quantity-column`. Otherwise every component occurrence uses `--default-quantity` (default `1`) and the report warns that the quantity was assumed. Confirm quantities with engineering before importing.
+
+The converter can read multiple Level 0 installations in one CSV. A parent with children becomes a BoM; nested parents can therefore have their own BoMs. A product that appears more than once is written once, while repeated occurrences under the same immediate parent have their quantities summed.
+
+### Processing and safety rules
+
+1. **Parse:** read the CSV, normalise blank values, and attach each row to its immediate parent.
+2. **Gate and validate:** hold an entire installation when its root or any descendant is not `Released`. Check required data, positive quantities, identities, generated ID collisions, self-references, and malformed rows. Other fully Released installations in the same file can still be exported.
+3. **Transform:** create unique Odoo Products and one BoM per included parent with children. 3DX products are non-purchasable; their names come from `Title`. The finished product is linked by Product External ID, and a component is linked by its unique Internal Reference.
+4. **Add manual procurement (optional):** include `Ready` purchased parts only when their parent is in a fully Released installation. Draft and held rows remain in the audit report.
+5. **Reconcile existing Odoo products (optional):** reuse External IDs from a supplied Odoo export. Match by Internal Reference first, then by unique Name. Missing or ambiguous assembly matches stop the run.
+6. **Write outputs:** always write the audit report once inputs have been parsed. When validation or reconciliation fails, return a non-zero exit code and remove stale Product and BoM import files from the chosen output directory.
+
+Product IDs are derived from the engineering identifier; BoM IDs include the parent identifier and revision; BoM line IDs include the component reference. Keep those identifiers stable between runs. Changing an identifier or revision can make Odoo treat a row as a different record. The output files do **not** create purchase orders, vendor records, Odoo Project links, or tasks.
+
+### Output files
+
+| File | Purpose |
+| --- | --- |
+| `odoo_products_import.xlsx` / `.csv` | Product records, including manufactured 3DX products and eligible purchased items. Import first. |
+| `odoo_bom_import.xlsx` / `.csv` | Parent BoMs and component lines. Import after Products. |
+| `conversion_report.xlsx` | Review-only audit workbook. Never import this into Odoo. |
+
+The Excel and CSV versions of an import contain the same rows. Choose one format for each Odoo model. The audit report has **Summary**, **Warnings**, **Rejected Rows**, **Source Mapping**, and **Procurement** sheets. A warning alone does not stop export; a rejected row or validation error does.
+
+## Codebase guide for TSS
+
+The entry point is `convert_3dx_to_odoo.py`. It reads command-line options and runs the stages below in order. The `converter/` package contains the business rules, while `tests/` exercises each stage and complete command-line runs.
+
+| File | Responsibility |
+| --- | --- |
+| `converter/models.py` | Typed data structures for source rows, Odoo products, BoMs, warnings, and rejected rows. |
+| `converter/parser.py` | Required CSV columns, row cleaning, hierarchy, and parent links. |
+| `converter/validator.py` | Release gating, quantity interpretation, identity checks, and validation errors. |
+| `converter/transformer.py` | Product and BoM construction, stable identifiers, duplicate line consolidation, and output rows. |
+| `converter/procurement.py` | Manual purchased-part CSV, Ready/Draft decisions, and purchased BoM lines. |
+| `converter/reconciler.py` | Matching an Odoo Product export to existing records and reusing their External IDs. |
+| `converter/odoo_writer.py` | Field-mapping validation plus CSV/XLSX import-file writing. |
+| `converter/report_writer.py` | Audit workbook and its five review sheets. |
+| `odoo_field_mapping.json` | Odoo import column labels; change this for database-specific headers. |
+| `tests/` | Parser, validation, transformation, reconciliation, procurement, and end-to-end tests. |
+
+For a change to **source interpretation**, start in `parser.py` or `validator.py`; for an Odoo value or relationship, inspect `transformer.py` and `odoo_writer.py`; for manually purchased parts, use `procurement.py`. Add a focused test for the rule changed, then run the whole suite. If adding a new Odoo column, update the model, row construction, writer keys, `odoo_field_mapping.json`, documentation, and an end-to-end test together.
 
 ## Manual procurement items
 
@@ -104,18 +175,18 @@ Run:
 
 Review the **Procurement** sheet in `conversion_report.xlsx`: it shows every manual row as Exported or Held with a reason. The converter creates purchasable Products and BoM lines. Actual purchase orders, vendor selection, receipt status, and project task tracking remain Odoo workflow steps; this CSV does not create those records.
 
-Every BoM component line receives a stable External ID. After the first clean import, importing the
-same converted BoM again updates its component lines instead of appending duplicates. BoMs imported
-with an older converter version must be deleted and imported once with the new file to seed these
-line identifiers.
+Every BoM component line receives a stable External ID. This is intended to let a repeat import
+update lines rather than append duplicates; TSS should verify that behaviour in the target Odoo
+database. BoMs imported with an older converter version may lack those line identifiers. Check
+them in staging and plan a controlled one-time replacement if needed before repeat imports.
 
 The 3DEXPERIENCE representation suffix `(Default_speedpak)` is removed from product names. It is technical representation metadata rather than part of the user-facing product title.
 
 ## Configure Odoo headers
 
-odoo_field_mapping.json is the only source for the Excel import headers. Edit its values, not the Python code, if the target Odoo database exports different field labels.
+`odoo_field_mapping.json` is the source for both Excel and CSV import headers. Edit its values, not the Python code, if the target Odoo database exports different field labels.
 
-Before a production import, export one Product and one BoM from the target Odoo database. Compare their import headers with odoo_field_mapping.json and update the JSON values to match exactly. Different Odoo versions, installed modules, and custom fields can alter these labels.
+Before a staging or production import, export one Product and one BoM from the target Odoo database. Compare their import headers with `odoo_field_mapping.json` and update the JSON values to match exactly. Different Odoo versions, installed modules, and custom fields can alter these labels.
 
 ## Odoo import sequence
 
@@ -273,7 +344,20 @@ conversion_report.xlsx contains:
 
 ## Run the tests
 
+From the repository root:
+
     cd 3dx_odoo_converter
     python -m pytest
 
-The end-to-end test runs the converter against the supplied CSV and verifies its expected 5 products, 1 BoM, and 4 BoM lines.
+The suite covers the parser, release and quantity validation, transformation, existing-product reconciliation, manual procurement, and command-line output. The end-to-end tests make a **temporary Released copy** of the supplied example to verify 5 products, 1 BoM, and 4 BoM lines. A separate test confirms the original **In Work** example produces only the audit report. These are offline tests; they do not test the team's live or staging Odoo database.
+
+## TSS takeover checklist
+
+1. **Use this branch's converter as the starting point.** Read this guide, install the requirements, and run the tests. Keep the sample's real `In Work` state unchanged; use a genuinely Released installation export for an import trial.
+2. **Agree on expected engineering data.** Have an engineer check the assembly, component list, quantities, units, and revisions. The example CSV has no authoritative quantity column, and assumed quantities must be reviewed rather than accepted by default.
+3. **Match the target Odoo database.** In a test database with Manufacturing enabled, export a Product and a BoM, confirm the field mapping and accepted Product/BoM types and units, then run the converter into a fresh output directory. If products already exist, include an import-compatible Odoo Product export through `--existing-products`.
+4. **Trial the import in order.** Read every sheet of `conversion_report.xlsx`, test/import Products, then test/import BoMs. Compare the resulting Odoo records with the engineering baseline. Test a Ready and a held procurement item if the team intends to use that input.
+5. **Test a repeat import.** Rerun conversion with the same stable identifiers and the current Odoo Product export. Confirm that products and BoM lines update without duplicates. Review any older BoMs that predate stable line IDs.
+6. **Record the result and release decision.** Save the approved source format, command options, field mapping, audit report, Odoo import results, and any fixes. Nominate an owner, then review and merge this feature branch into `main` when the staging workflow is accepted.
+
+The remaining deployment date depends on the staging result. The converter is a local file-generation tool, so “deployment” for this version means establishing an owned run-and-import process, not installing an API service.
